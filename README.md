@@ -16,16 +16,18 @@
 
 ## ✨ What Is This?
 
-Smart Workflow Automation lets you create complex automations using **plain English**. Powered by a multi-LLM AI engine with a full **Model Context Protocol (MCP)** server and **Google OAuth integrations**, it understands your intent, builds workflows automatically, and connects to your Google account for Gmail, Sheets, Calendar, and Drive.
+Smart Workflow Automation lets you create complex automations using **plain English**. Powered by a multi-LLM AI engine with **dynamic code generation**, a full **Model Context Protocol (MCP)** server, and **Google OAuth integrations**, it understands your intent, builds workflows automatically, and can even generate custom code on-the-fly for capabilities it doesn't have built-in.
 
 ### Just say:
 - _"Fetch Bitcoin price and email me via Gmail"_ → ✅ Done
 - _"Check AAPL stock every 5 minutes and save to Google Sheets"_ → ✅ Done
 - _"Email me top HackerNews stories every morning"_ → ✅ Done
+- _"Fetch top stories from Times of India and email me a summary"_ → ✅ Dynamic!
+- _"Scrape trending GitHub repos and email me"_ → ✅ Dynamic!
 - _"Create a calendar event for team standup tomorrow at 10am"_ → ✅ Done
-- _"Send me weather updates on WhatsApp daily at 8 AM"_ → ✅ Done
+- _"Fetch latest NDTV headlines and email me"_ → ✅ Dynamic!
 
-No coding required. Just natural language.
+No coding required. Just natural language. If a built-in tool doesn't exist, the AI **writes one automatically**.
 
 ---
 
@@ -43,6 +45,14 @@ No coding required. Just natural language.
 - Smart entity extraction + context-aware clarification
 - **Self-healing AI**: auto-validates & fixes malformed workflows
 
+### 🧬 **Dynamic Code Generation (NEW)**
+- **Intent analysis**: detects when no built-in tool can handle a request
+- **AI writes Python code**: LLM generates sandboxed functions for custom capabilities
+- **Learned tools**: successfully generated code is saved to Firestore and **reused** for identical future requests — no LLM call needed
+- **Secure sandbox**: restricted imports, execution timeout, cross-platform (SIGALRM on Linux, threading on Windows)
+- **Known sources**: optimized RSS/scraping patterns for 10+ popular news sites and web targets
+- Supports: RSS feeds, web scraping, public APIs, data processing, and any task expressible in Python
+
 ### 🔐 **Google OAuth Integration**
 - **Sign in with Google** — single sign-on with full API access
 - **Gmail** — Send emails via user's own Gmail account
@@ -58,11 +68,12 @@ No coding required. Just natural language.
 - ContextMemory + execution logging for every tool call
 - Stateless mode — optimized for cloud deployment (Render)
 
-### 📋 **Tool Registry (30+ Tools)**
+### 📋 **Tool Registry (30+ Tools + Unlimited Dynamic)**
 - Centralized registry with JSON Schema definitions
 - 8 categories: `data_fetch`, `web_scraping`, `data_transform`, `notification`, `action`, `control_flow`, `google_oauth`
 - Dynamic handler linking at startup
 - MCP-ready with `inputSchema` for each tool
+- **Dynamic tools**: unlimited additional capabilities via AI code generation
 
 ### 📊 **Real-Time Data Integrations**
 - **Stock Prices**: Yahoo Finance (real-time)
@@ -98,6 +109,7 @@ No coding required. Just natural language.
 
 **Backend (Python AI):**
 - FastAPI + Multi-LLM (Groq, HuggingFace, OpenRouter, Gemini)
+- Dynamic code generation + sandboxed execution + Firebase learned tool storage
 
 **Google APIs:**
 - OAuth2 (Sign-in + API access) · Gmail API · Sheets API · Calendar API · Drive API
@@ -137,6 +149,9 @@ graph TD
     PyService --> HuggingFace[HuggingFace]
     PyService --> OpenRouter[OpenRouter]
     PyService --> Gemini[Google Gemini]
+    PyService --> DynGen[Dynamic Code Generator]
+    DynGen --> Sandbox[Secure Python Sandbox]
+    DynGen --> LearnedTools[(Firestore - Learned Tools)]
     end
     
     subgraph Google[Google APIs]
@@ -231,6 +246,10 @@ TWILIO_PHONE_NUMBER=+1234567890
 # Optional
 WEATHER_API_KEY=your-openweather-key
 DISCORD_WEBHOOK_URL=your-discord-webhook
+
+# Dynamic Code Generation
+DYNAMIC_FEATURES_ENABLED=true
+SANDBOX_MODE=local                   # 'local' or 'lambda'
 ```
 
 ### Google Cloud Setup
@@ -318,6 +337,17 @@ curl -X POST http://localhost:3000/mcp \
 "Send me Mumbai weather every morning at 8 AM via WhatsApp"
 ```
 
+### 🧬 Dynamic — News Scraping (AI-generated code)
+```
+"Fetch top stories from Times of India and email me a summary"
+"Fetch latest NDTV headlines and email me"
+```
+
+### 🧬 Dynamic — Web Scraping (AI-generated code)
+```
+"Scrape the top trending repositories on GitHub and email me"
+```
+
 ---
 
 ## 📦 Project Structure
@@ -350,9 +380,11 @@ workflow-automation/
 │   │   └── logger.js               # Winston logger
 │   └── routes/                     # REST API routes
 ├── engine-py/                      # Python AI service (FastAPI)
-│   ├── app.py                      # Multi-LLM provider cascade
+│   ├── app.py                      # Multi-LLM provider cascade + /execute_dynamic
 │   ├── config.py                   # LLM configuration
-│   ├── prompts.py                  # System prompts + Google tool examples
+│   ├── prompts.py                  # System prompts + dynamic code generation prompts
+│   ├── dynamic_resolver.py         # Capability gap resolver + Firestore learned tools
+│   ├── sandbox.py                  # Secure sandbox for AI-generated code execution
 │   └── validator.py                # Workflow validation
 ├── Frontend/my-app/                # Next.js 14 frontend
 ├── serviceAccountKey.json          # Firebase service account (gitignored)
@@ -418,7 +450,7 @@ permission from the author.
 - **Google Gemini** — Fallback AI engine
 - **Anthropic MCP** — Model Context Protocol standard
 - **OpenRouter** — Multi-model routing
-- **Firebase** — User token storage & execution logging
+- **Firebase** — User token storage, execution logging & learned tool storage
 - **Render** — Backend deployment
 - **Vercel** — Frontend hosting
 
@@ -428,7 +460,7 @@ permission from the author.
 
 **⚡ Transform plain English into powerful automations ⚡**
 
-**🔌 MCP-compatible · 30+ tools · Multi-LLM · Google Integrated · Production-ready**
+**🔌 MCP-compatible · 30+ tools · Dynamic Code Gen · Multi-LLM · Google Integrated · Production-ready**
 
 Built with ❤️ by [@jayyycodes](https://github.com/jayyycodes)
 

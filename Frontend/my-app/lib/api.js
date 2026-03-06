@@ -104,6 +104,18 @@ class APIClient {
         return this.request('/auth/google/status');
     }
 
+    // User profile endpoints
+    async getProfile() {
+        return this.request('/user/profile');
+    }
+
+    async updateProfile(data) {
+        return this.request('/user/profile', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
     // Automation endpoints
     async getAutomations() {
         return this.request('/automations');

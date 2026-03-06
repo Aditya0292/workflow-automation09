@@ -5,9 +5,11 @@ Self-healing AI service with:
 - Auto-retry for generation failures (max 3 attempts)
 - Registry-aware tool validation
 - Dynamic prompt injection from tool registry
+- Dynamic code generation for capability gaps (feature-flagged)
 - Backward-compatible API
 """
 
+import os
 import json
 import re
 import logging
@@ -15,8 +17,8 @@ import httpx
 import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, validator
+from typing import Optional, List
 from datetime import datetime
 
 from config import (
@@ -28,14 +30,22 @@ from prompts import (
     ENTITY_EXTRACTION_PROMPT, 
     TWITTER_RESEARCH_PROMPT,
     RETRY_CORRECTION_PROMPT,
+    INTENT_ANALYSIS_PROMPT,
+    CODE_GENERATION_PROMPT,
     build_generation_prompt,
     fetch_registry,
-    get_allowed_tool_names
+    get_allowed_tool_names,
+    get_tool_prompt_text
 )
 
 from validator import validate_automation, sanitize_automation
 from clarification import ClarificationHandler
 from required_fields import normalize_channel_response
+from dynamic_resolver import resolve_capability_gaps
+from sandbox import execute_in_sandbox
+
+# ─── Feature Flag ───────────────────────────────────────────────────────
+DYNAMIC_FEATURES_ENABLED = os.getenv("DYNAMIC_FEATURES_ENABLED", "false").lower() == "true"
 
 # OpenRouter API endpoint
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -114,6 +124,19 @@ class IntentResponse(BaseModel):
     intent: str
     entities: dict
     channel: str
+
+
+class DynamicExecuteRequest(BaseModel):
+    """Request model for dynamic code execution"""
+    generated_code: str
+    inputs: dict = {}
+    context: dict = {}
+
+    @validator("generated_code")
+    def code_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("generated_code cannot be empty")
+        return v
 
 
 # ============================================================
@@ -330,14 +353,42 @@ def generate_with_retry(user_request: str) -> dict:
     Generate automation JSON with self-healing retry loop.
     
     Flow:
-    1. Generate with full prompt
-    2. Parse JSON response
-    3. Validate against schema + registry
-    4. If invalid → build retry prompt with error context → re-call LLM
-    5. Max 3 attempts with exponential backoff
+    1. (If DYNAMIC_FEATURES_ENABLED) Analyze intent for capability gaps
+    2. Generate with full prompt
+    3. Parse JSON response
+    4. Validate against schema + registry
+    5. If invalid → build retry prompt with error context → re-call LLM
+    6. Max 3 attempts with exponential backoff
     
     Returns: { success, automation, attempts, errors }
     """
+    # ─── Dynamic Pre-Step: Intent Analysis ───────────────────────────────
+    dynamic_steps = []
+    if DYNAMIC_FEATURES_ENABLED:
+        try:
+            logger.info("🧠 Dynamic features enabled — analyzing intent for capability gaps")
+            tool_list = get_tool_prompt_text()
+            analysis_prompt = INTENT_ANALYSIS_PROMPT.format(
+                available_tools=tool_list,
+                user_request=user_request
+            )
+            analysis_response = call_llm(analysis_prompt)
+            analysis = extract_json_from_response(analysis_response)
+
+            if not analysis.get("can_fulfill_with_existing", True):
+                gaps = analysis.get("gaps", [])
+                if gaps:
+                    logger.info(f"🔍 Found {len(gaps)} capability gap(s), generating dynamic code")
+                    dynamic_steps = resolve_capability_gaps(
+                        gaps, call_llm, CODE_GENERATION_PROMPT, original_request=user_request
+                    )
+                    logger.info(f"✅ Generated {len(dynamic_steps)} dynamic step(s)")
+            else:
+                logger.info("✅ All capabilities covered by existing tools — proceeding normally")
+        except Exception as e:
+            logger.warning(f"⚠️ Intent analysis failed, proceeding with standard flow: {e}")
+            dynamic_steps = []
+
     attempts = []
     max_attempts = RETRY_CONFIG["max_attempts"]
     
@@ -349,7 +400,29 @@ def generate_with_retry(user_request: str) -> dict:
         try:
             if attempt == 1:
                 # First attempt: use full generation prompt
-                full_prompt = build_generation_prompt(user_request)
+                if dynamic_steps:
+                    # Dynamic steps exist — tell the LLM that data-fetching is handled
+                    dynamic_descriptions = "\n".join(
+                        f"  - Step type 'dynamic' (capability: {ds['capability']}): {ds['description']}"
+                        for ds in dynamic_steps
+                    )
+                    dynamic_addendum = (
+                        f"\n\n══════════════════════════════════════════════════\n"
+                        f"  PRE-HANDLED DYNAMIC STEPS\n"
+                        f"══════════════════════════════════════════════════\n"
+                        f"The following capabilities are ALREADY handled by dynamic code generation.\n"
+                        f"Do NOT add any data-fetching step for these — they will be auto-injected:\n"
+                        f"{dynamic_descriptions}\n\n"
+                        f"Your job: ONLY generate the notification/output steps (send_email, notify, "
+                        f"append_google_sheet, etc.) that consume the data produced by the dynamic steps.\n"
+                        f"The dynamic step output includes a 'summary' key with human-readable formatted text.\n"
+                        f"For email body or notification message, use {{{{step_1.summary}}}} to get the formatted text.\n"
+                        f"Do NOT include scrape_*, fetch_*, http_request, or any data-fetching tool.\n"
+                    )
+                    full_prompt = build_generation_prompt(user_request) + dynamic_addendum
+                    logger.info("📝 Using dynamic-aware generation prompt")
+                else:
+                    full_prompt = build_generation_prompt(user_request)
             else:
                 # Retry: use correction prompt with error context
                 prev_error = attempts[-1]["error"]
@@ -384,6 +457,30 @@ def generate_with_retry(user_request: str) -> dict:
             # Sanitize
             automation = sanitize_automation(automation)
             
+            # Inject dynamic steps if any were generated
+            if dynamic_steps:
+                existing_steps = automation.get("steps", [])
+                
+                # Strip data-fetching steps that the LLM may have added despite being 
+                # told not to — these duplicate the dynamic steps
+                data_fetch_prefixes = ("scrape_", "fetch_", "http_request")
+                original_count = len(existing_steps)
+                existing_steps = [
+                    step for step in existing_steps 
+                    if not step.get("type", "").startswith(data_fetch_prefixes)
+                ]
+                stripped = original_count - len(existing_steps)
+                if stripped:
+                    logger.info(f"🧹 Stripped {stripped} redundant data-fetching step(s) from LLM output")
+                
+                # Insert dynamic steps at the beginning (position 0)
+                # so they become step_1, step_2, etc. and notification steps can reference them
+                for i, ds in enumerate(dynamic_steps):
+                    existing_steps.insert(i, ds)
+                
+                automation["steps"] = existing_steps
+                logger.info(f"📦 Injected {len(dynamic_steps)} dynamic step(s) into workflow")
+            
             # Success!
             duration = time.time() - attempt_start
             attempts.append({
@@ -403,7 +500,8 @@ def generate_with_retry(user_request: str) -> dict:
                 "success": True,
                 "automation": automation,
                 "attempts": len(attempts),
-                "attempt_details": attempts
+                "attempt_details": attempts,
+                "dynamic_steps_count": len(dynamic_steps)
             }
             
         except HTTPException:
@@ -506,16 +604,21 @@ async def health_check():
     if GROQ_API_KEY: configured_providers.append("groq")
     if HUGGINGFACE_API_KEY: configured_providers.append("huggingface")
 
+    features = ["clarification", "voice_mode", "multi_turn", "auto_retry", "registry_aware", "multi_provider_fallback"]
+    if DYNAMIC_FEATURES_ENABLED:
+        features.append("dynamic_code_generation")
+
     return {
         "status": "python service ready",
         "timestamp": datetime.now().isoformat(),
-        "version": "2.1.0",
+        "version": "2.2.0",
         "llm_providers": configured_providers,
         "llm_provider_count": len(configured_providers),
         "llm_configured": len(configured_providers) > 0,
         "primary_model": GEMINI_MODEL if GEMINI_API_KEY else (GROQ_MODEL if GROQ_API_KEY else LLM_MODEL),
         "allowed_steps": get_allowed_tool_names(),
-        "features": ["clarification", "voice_mode", "multi_turn", "auto_retry", "registry_aware", "multi_provider_fallback"]
+        "features": features,
+        "dynamic_code_generation": DYNAMIC_FEATURES_ENABLED
     }
 
 
@@ -737,6 +840,33 @@ async def research_twitter(request: TextRequest):
     except Exception as e:
         logger.error(f"❌ Twitter research failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# Dynamic Code Execution
+# ============================================================
+
+@app.post("/execute_dynamic")
+async def execute_dynamic(request: DynamicExecuteRequest):
+    """
+    Execute dynamically generated Python code in sandbox.
+    Used by the Node.js workflow executor for 'dynamic' step types.
+    """
+    try:
+        logger.info(f"⚡ Executing dynamic code (len={len(request.generated_code)})")
+        result = execute_in_sandbox(
+            generated_code=request.generated_code,
+            inputs=request.inputs,
+            context=request.context
+        )
+        return result
+    except Exception as e:
+        logger.error(f"❌ Dynamic execution failed: {str(e)}")
+        return {
+            "success": False,
+            "result": None,
+            "error": f"Execution error: {str(e)}"
+        }
 
 
 # ============================================================

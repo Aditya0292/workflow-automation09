@@ -26,6 +26,9 @@ import {
 
 // ─── Configuration ─────────────────────────────────────────────────────
 
+// Python AI Engine URL (for dynamic code execution)
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
+
 const RETRY_CONFIG = {
     maxRetries: 3,
     baseDelayMs: 1000,         // 1s, 2s, 4s exponential
@@ -326,19 +329,80 @@ export const executeWorkflow = async (automation, executionId, user = null) => {
             const step = steps[i];
             const stepNumber = i + 1;
 
+            // Build context from memory (needed by both dynamic and regular steps)
+            const stepContext = memory.buildStepContext();
+            stepContext.automation = automation; // attach full automation
+
             logger.info(`Executing step ${stepNumber}/${steps.length}`, {
                 executionId,
                 stepType: step.type
             });
 
-            // Check if step type is supported
+            // Check if step type is supported (skip for dynamic steps)
+            if (step.type === 'dynamic') {
+                // Dynamic step: execute via Python service
+                const dynamicStartTime = Date.now();
+                logger.info(`Executing DYNAMIC step ${stepNumber}: ${step.capability || 'unknown'}`, {
+                    executionId,
+                    capability: step.capability
+                });
+
+                try {
+                    const dynamicResponse = await fetch(`${PYTHON_SERVICE_URL}/execute_dynamic`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            generated_code: step.generated_code,
+                            inputs: resolveVariables(step.inputs || {}, stepContext),
+                            context: {
+                                stepOutputs: stepContext.stepOutputs || {},
+                                user: stepContext.user || null
+                            }
+                        })
+                    });
+
+                    const dynamicResult = await dynamicResponse.json();
+
+                    if (!dynamicResult.success) {
+                        throw new Error(dynamicResult.error || 'Dynamic step execution failed');
+                    }
+
+                    const dynamicDuration = Date.now() - dynamicStartTime;
+
+                    // Store result in context memory like any other step
+                    const result = {
+                        output: dynamicResult.result,
+                        duration_ms: dynamicDuration,
+                        retries: 0,
+                        error: null
+                    };
+
+                    await logStepResult(executionId, i, `dynamic:${step.capability}`, result);
+                    memory.storeStepOutput(i, `dynamic:${step.capability}`, result.output);
+
+                    if (step.outputAs) {
+                        memory.stepOutputs[step.outputAs] = result.output;
+                    }
+
+                    stepResults.push({
+                        step: stepNumber,
+                        type: `dynamic:${step.capability}`,
+                        output: result.output,
+                        duration: dynamicDuration,
+                        retries: 0
+                    });
+
+                    logger.info(`Dynamic step ${stepNumber} completed: ${step.capability}`, { executionId });
+                    continue;
+
+                } catch (dynamicError) {
+                    throw new Error(`Dynamic step ${stepNumber} (${step.capability}) failed: ${dynamicError.message}`);
+                }
+            }
+
             if (!isStepSupported(step.type)) {
                 throw new Error(`Unsupported step type: ${step.type}`);
             }
-
-            // Build context from memory (backward compatible)
-            const stepContext = memory.buildStepContext();
-            stepContext.automation = automation; // attach full automation
 
             // Execute with retry
             const result = await executeStepWithRetry(step, stepContext, stepNumber, executionId);

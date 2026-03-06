@@ -427,11 +427,12 @@ const sendSms = async (params, context) => {
     let recipientPhone = params.to;
 
     if (!recipientPhone || recipientPhone === '+1234567890') {
-        // Simplified - only use whatsapp_number field (same phone for SMS and WhatsApp)
-        recipientPhone = context.user?.whatsapp_number || context.user?.whatsappNumber;
+        // Try user's saved phone number (check both field naming conventions)
+        recipientPhone = context.user?.phoneNumber || context.user?.phone_number ||
+            context.user?.whatsapp_number || context.user?.whatsappNumber;
 
         if (!recipientPhone) {
-            throw new Error('No phone number specified. Please update your profile.');
+            throw new Error('No phone number found. Please go to Settings → Account and save your phone number first.');
         }
 
         // Format with country code (auto-detect India)

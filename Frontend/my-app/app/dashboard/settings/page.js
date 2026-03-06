@@ -1,16 +1,58 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { User, Bell, Lock, Key, Globe, Moon } from 'lucide-react';
+import { User, Bell, Lock, Key, Globe, Phone, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
+import api from '@/lib/api';
 
 export default function SettingsPage() {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('account');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [whatsappNumber, setWhatsappNumber] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [saveStatus, setSaveStatus] = useState(null); // 'success' | 'error' | null
+    const [saveMessage, setSaveMessage] = useState('');
+
+    // Load profile on mount
+    useEffect(() => {
+        const loadProfile = async () => {
+            try {
+                const data = await api.getProfile();
+                if (data.user) {
+                    setPhoneNumber(data.user.phoneNumber || data.user.phone_number || '');
+                    setWhatsappNumber(data.user.whatsappNumber || data.user.whatsapp_number || '');
+                }
+            } catch (e) {
+                console.error('Failed to load profile:', e);
+            }
+        };
+        loadProfile();
+    }, []);
+
+    const handleSaveProfile = async () => {
+        setSaving(true);
+        setSaveStatus(null);
+        try {
+            const updates = {};
+            if (phoneNumber) updates.phoneNumber = phoneNumber;
+            if (whatsappNumber) updates.whatsappNumber = whatsappNumber;
+
+            await api.updateProfile(updates);
+            setSaveStatus('success');
+            setSaveMessage('Profile saved successfully!');
+        } catch (e) {
+            setSaveStatus('error');
+            setSaveMessage(e.message || 'Failed to save profile');
+        } finally {
+            setSaving(false);
+            setTimeout(() => setSaveStatus(null), 4000);
+        }
+    };
 
     const sections = [
         { id: 'account', icon: User, label: 'Account' },
@@ -44,8 +86,8 @@ export default function SettingsPage() {
                                 key={section.id}
                                 onClick={() => setActiveTab(section.id)}
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${activeTab === section.id
-                                        ? 'bg-green-600 text-white shadow-lg shadow-green-900/20'
-                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                    ? 'bg-green-600 text-white shadow-lg shadow-green-900/20'
+                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
                                     }`}
                             >
                                 <section.icon className="w-5 h-5" />
@@ -67,20 +109,83 @@ export default function SettingsPage() {
                             <div className="space-y-6">
                                 <div>
                                     <h2 className="text-xl font-bold text-white mb-1">Profile Information</h2>
-                                    <p className="text-gray-400 text-sm">Update your public profile details.</p>
+                                    <p className="text-gray-400 text-sm">Update your profile details and contact information.</p>
                                 </div>
                                 <div className="space-y-4 max-w-md">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Full Name</label>
-                                        <Input defaultValue={user?.name} className="bg-black/40 border-white/10 text-white" />
+                                        <Input defaultValue={user?.name} disabled className="bg-black/40 border-white/10 text-gray-400 cursor-not-allowed" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Email Address</label>
                                         <Input defaultValue={user?.email} disabled className="bg-black/40 border-white/10 text-gray-400 cursor-not-allowed" />
                                     </div>
+
+                                    {/* Phone Number Section */}
+                                    <div className="pt-4 border-t border-white/5">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <Phone className="w-5 h-5 text-green-500" />
+                                            <h3 className="text-base font-semibold text-white">Phone Numbers</h3>
+                                        </div>
+                                        <p className="text-gray-400 text-xs mb-4">
+                                            Add your phone number to enable SMS and WhatsApp automations. Use international format (e.g., +919876543210).
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                            Phone Number (SMS)
+                                        </label>
+                                        <Input
+                                            value={phoneNumber}
+                                            onChange={e => setPhoneNumber(e.target.value)}
+                                            placeholder="+919876543210"
+                                            className="bg-black/40 border-white/10 text-white placeholder:text-gray-600"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                            WhatsApp Number
+                                        </label>
+                                        <Input
+                                            value={whatsappNumber}
+                                            onChange={e => setWhatsappNumber(e.target.value)}
+                                            placeholder="+919876543210"
+                                            className="bg-black/40 border-white/10 text-white placeholder:text-gray-600"
+                                        />
+                                        <p className="text-gray-500 text-xs mt-1">Used for WhatsApp notifications and SMS fallback.</p>
+                                    </div>
                                 </div>
-                                <div className="pt-4 border-t border-white/5">
-                                    <Button className="bg-green-600 hover:bg-green-500">Save Changes</Button>
+
+                                {/* Save Button + Status */}
+                                <div className="pt-4 border-t border-white/5 flex items-center gap-4">
+                                    <Button
+                                        className="bg-green-600 hover:bg-green-500"
+                                        onClick={handleSaveProfile}
+                                        disabled={saving}
+                                    >
+                                        {saving ? 'Saving...' : 'Save Changes'}
+                                    </Button>
+                                    {saveStatus === 'success' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            className="flex items-center gap-1.5 text-green-400 text-sm"
+                                        >
+                                            <CheckCircle className="w-4 h-4" />
+                                            {saveMessage}
+                                        </motion.div>
+                                    )}
+                                    {saveStatus === 'error' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            className="flex items-center gap-1.5 text-red-400 text-sm"
+                                        >
+                                            <AlertCircle className="w-4 h-4" />
+                                            {saveMessage}
+                                        </motion.div>
+                                    )}
                                 </div>
                             </div>
                         )}
