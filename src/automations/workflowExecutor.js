@@ -356,7 +356,10 @@ export const executeWorkflow = async (automation, executionId, user = null) => {
                             inputs: resolveVariables(step.inputs || {}, stepContext),
                             context: {
                                 stepOutputs: stepContext.stepOutputs || {},
-                                user: stepContext.user || null
+                                user: stepContext.user || null,
+                                save_as_learned_tool: step.save_as_learned_tool || false,
+                                capability: step.capability || '',
+                                description: step.description || ''
                             }
                         })
                     });

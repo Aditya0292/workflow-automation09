@@ -8,6 +8,7 @@ The generated code is returned as "dynamic_step" objects that can be
 injected into the workflow and executed by the sandbox.
 
 Learned tools are stored in Firebase Firestore for persistence across deploys.
+Includes auto-retry with error correction (up to 3 attempts per gap).
 """
 
 import ast
@@ -17,6 +18,8 @@ import os
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
+
+MAX_CODE_GEN_ATTEMPTS = 3
 
 # ─── Firebase Firestore Setup ───────────────────────────────────────────
 
@@ -131,11 +134,31 @@ def _save_learned_tool(capability: str, description: str, generated_code: str, i
         logger.warning(f"⚠️ Firestore save failed for '{capability}': {e}")
 
 
+# ─── Test Runner ────────────────────────────────────────────────────────
+
+def _test_generated_code(generated_code: str, inputs: dict) -> dict:
+    """Quick test run of generated code using local sandbox.
+    Used to verify code works before returning it as a dynamic step."""
+    try:
+        from sandbox import execute_in_sandbox
+        # Force local mode for test runs regardless of SANDBOX_MODE
+        result = execute_in_sandbox(
+            generated_code,
+            inputs,
+            {},
+            force_local=True
+        )
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 # ─── Core Resolver ──────────────────────────────────────────────────────
 
 def resolve_capability_gaps(gaps: list, call_llm_fn, code_gen_prompt: str, original_request: str = "") -> list:
     """
     For each capability gap, generate a Python function via LLM.
+    Includes auto-retry (up to 3 attempts) with error correction prompts.
 
     Args:
         gaps: List of gap dicts from intent analysis, e.g.:
@@ -172,33 +195,79 @@ def resolve_capability_gaps(gaps: list, call_llm_fn, code_gen_prompt: str, origi
             logger.info(f"♻️ Reusing learned tool for: {capability}")
             continue
 
+        # Build base prompt
+        base_prompt = code_gen_prompt.format(
+            capability=capability,
+            description=description,
+            inputs_schema=json.dumps(inputs, indent=2),
+            original_request=original_request
+        )
+
+        generated_code = None
+        prompt = base_prompt
+
         try:
-            # Build the code generation prompt
-            prompt = code_gen_prompt.format(
-                capability=capability,
-                description=description,
-                inputs_schema=json.dumps(inputs, indent=2),
-                original_request=original_request
-            )
+            for attempt in range(1, MAX_CODE_GEN_ATTEMPTS + 1):
+                logger.info(f"🔄 Attempt {attempt}/{MAX_CODE_GEN_ATTEMPTS} for: {capability}")
 
-            # Call LLM cascade to generate code
-            raw_response = call_llm_fn(prompt)
+                # Call LLM cascade to generate code
+                raw_response = call_llm_fn(prompt)
 
-            # Extract code from response (handle markdown code blocks)
-            generated_code = _extract_code(raw_response)
+                # Extract code from response (handle markdown code blocks)
+                code = _extract_code(raw_response)
+
+                if not code:
+                    logger.warning(f"⚠️ Attempt {attempt}: LLM returned no valid code for: {capability}")
+                    continue
+
+                # Validate syntax
+                if not _validate_syntax(code):
+                    logger.warning(f"⚠️ Attempt {attempt}: syntax errors for: {capability}")
+                    continue
+
+                # Validate that it defines a run() function
+                if not _has_run_function(code):
+                    logger.warning(f"⚠️ Attempt {attempt}: missing run() function for: {capability}")
+                    continue
+
+                # Quick test run with the gap's example inputs
+                test_result = _test_generated_code(code, inputs)
+
+                if test_result.get("success") and not test_result.get("result", {}).get("error"):
+                    # Code works — use it
+                    generated_code = code
+                    logger.info(f"✅ Attempt {attempt}: code passed test run for: {capability}")
+                    break
+                else:
+                    # Code failed — build error correction prompt and retry
+                    error_msg = (
+                        test_result.get("result", {}).get("error")
+                        or test_result.get("error", "Unknown error")
+                    )
+                    logger.warning(f"⚠️ Attempt {attempt} failed for {capability}: {error_msg}")
+
+                    if attempt < MAX_CODE_GEN_ATTEMPTS:
+                        # Add error context to next prompt for self-correction
+                        prompt = base_prompt + f"""
+
+IMPORTANT — YOUR PREVIOUS ATTEMPT FAILED WITH THIS ERROR:
+{error_msg}
+
+Common causes and fixes:
+- If error is "404" or "Not Found" → the URL is wrong, use the KNOWN RSS FEEDS list
+- If error is "NoneType has no attribute" → add None checks before accessing tag content
+- If error is "Connection refused" → the URL may be blocked, try the RSS feed instead
+- If error is "No items found" → the CSS selectors are wrong, try different tag names
+- If error mentions "tree builder" or "xml" → use "html.parser" instead of "xml"
+- If error is "Timeout" → reduce the number of items or simplify the logic
+
+Fix the specific error above and regenerate the function.
+Output ONLY the corrected Python code:"""
+                    else:
+                        logger.error(f"❌ All {MAX_CODE_GEN_ATTEMPTS} attempts failed for: {capability}")
 
             if not generated_code:
-                logger.warning(f"⚠️ LLM returned no valid code for gap: {capability}")
-                continue
-
-            # Validate syntax
-            if not _validate_syntax(generated_code):
-                logger.warning(f"⚠️ Generated code has syntax errors for gap: {capability}")
-                continue
-
-            # Validate that it defines a run() function
-            if not _has_run_function(generated_code):
-                logger.warning(f"⚠️ Generated code missing run() function for gap: {capability}")
+                logger.error(f"❌ Could not generate working code for: {capability}")
                 continue
 
             dynamic_step = {
@@ -208,11 +277,8 @@ def resolve_capability_gaps(gaps: list, call_llm_fn, code_gen_prompt: str, origi
                 "generated_code": generated_code,
                 "inputs": inputs,
                 "outputAs": capability,
-                "save_as_learned_tool": True
+                "save_as_learned_tool": True  # Will be saved AFTER successful execution (not here)
             }
-
-            # Save as learned tool for future reuse
-            _save_learned_tool(capability, description, generated_code, inputs)
 
             dynamic_steps.append(dynamic_step)
             logger.info(f"✅ Generated dynamic step for: {capability}")

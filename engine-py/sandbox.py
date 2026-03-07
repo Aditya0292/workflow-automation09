@@ -116,6 +116,12 @@ def _execute_local(generated_code: str, inputs: dict, context: dict) -> dict:
         except ImportError:
             bs4 = None
 
+        try:
+            import lxml
+            import lxml.etree
+        except ImportError:
+            lxml = None
+
         # Safe import wrapper — only allows whitelisted modules
         ALLOWED_IMPORTS = {
             "requests": requests_lib,
@@ -123,6 +129,8 @@ def _execute_local(generated_code: str, inputs: dict, context: dict) -> dict:
             "re": re,
             "datetime": datetime,
             "bs4": bs4,
+            "lxml": lxml,
+            "lxml.etree": lxml.etree if lxml else None,
             "math": math,
             "html": html_module,
             "urllib": __import__("urllib"),
@@ -199,6 +207,7 @@ def _execute_local(generated_code: str, inputs: dict, context: dict) -> dict:
             "re": re,
             "datetime": datetime,
             "bs4": bs4,
+            "lxml": lxml,
             "math": math,
             "html": html_module,
             "collections": collections,
@@ -336,7 +345,7 @@ def _is_lambda_infra_error(result: dict) -> bool:
 
 # ─── Public API ─────────────────────────────────────────────────────────
 
-def execute_in_sandbox(generated_code: str, inputs: dict, context: dict) -> dict:
+def execute_in_sandbox(generated_code: str, inputs: dict, context: dict, force_local: bool = False) -> dict:
     """
     Execute generated Python code in the configured sandbox.
 
@@ -344,13 +353,14 @@ def execute_in_sandbox(generated_code: str, inputs: dict, context: dict) -> dict
         generated_code: Python source code defining a run(inputs, context) function
         inputs: Dict of input parameters
         context: Dict of execution context (step outputs, etc.)
+        force_local: If True, skip Lambda and use local execution directly
 
     Returns:
         { "success": bool, "result": dict, "error": str or None }
     """
     mode = SANDBOX_MODE
 
-    if mode == "local":
+    if force_local or mode == "local":
         logger.info("🔧 Executing dynamic code in LOCAL sandbox")
         return _execute_local(generated_code, inputs, context)
 
@@ -374,3 +384,4 @@ def execute_in_sandbox(generated_code: str, inputs: dict, context: dict) -> dict
     # Unknown mode — default to local
     logger.warning(f"⚠️ Unknown SANDBOX_MODE '{mode}', using local execution")
     return _execute_local(generated_code, inputs, context)
+

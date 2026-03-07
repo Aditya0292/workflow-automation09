@@ -8,7 +8,6 @@ export function MouseGlow() {
 
     useEffect(() => {
         const updateMousePosition = (e) => {
-            // Normalize to viewport percentage for smooth performance
             setMousePosition({
                 x: (e.clientX / window.innerWidth) * 100,
                 y: (e.clientY / window.innerHeight) * 100,
@@ -21,11 +20,11 @@ export function MouseGlow() {
 
     return (
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-            {/* Main glow that follows cursor - Primary green */}
+            {/* Main glow that follows cursor - Emerald primary */}
             <motion.div
-                className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-30"
+                className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-25"
                 style={{
-                    background: 'radial-gradient(circle, rgba(34,197,94,0.5) 0%, rgba(22,163,74,0.3) 40%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(16,185,129,0.4) 0%, rgba(5,150,105,0.25) 40%, transparent 70%)',
                     transform: 'translate(-50%, -50%)',
                 }}
                 animate={{
@@ -40,11 +39,11 @@ export function MouseGlow() {
                 }}
             />
 
-            {/* Secondary delayed glow - Emerald */}
+            {/* Secondary delayed glow - Emerald dark */}
             <motion.div
-                className="absolute w-[500px] h-[500px] rounded-full blur-[100px] opacity-20"
+                className="absolute w-[500px] h-[500px] rounded-full blur-[100px] opacity-15"
                 style={{
-                    background: 'radial-gradient(circle, rgba(16,185,129,0.4) 0%, rgba(5,150,105,0.2) 50%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(16,185,129,0.3) 0%, rgba(6,78,59,0.2) 50%, transparent 70%)',
                     transform: 'translate(-50%, -50%)',
                 }}
                 animate={{
@@ -59,11 +58,11 @@ export function MouseGlow() {
                 }}
             />
 
-            {/* Subtle trailing glow - Lime */}
+            {/* Subtle trailing glow */}
             <motion.div
-                className="absolute w-[400px] h-[400px] rounded-full blur-[80px] opacity-15"
+                className="absolute w-[400px] h-[400px] rounded-full blur-[80px] opacity-10"
                 style={{
-                    background: 'radial-gradient(circle, rgba(74,222,128,0.3) 0%, rgba(34,197,94,0.1) 50%, transparent 60%)',
+                    background: 'radial-gradient(circle, rgba(52,211,153,0.25) 0%, rgba(16,185,129,0.1) 50%, transparent 60%)',
                     transform: 'translate(-50%, -50%)',
                 }}
                 animate={{

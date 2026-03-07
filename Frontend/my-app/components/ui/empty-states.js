@@ -37,7 +37,7 @@ export function EmptyAutomations() {
                         repeat: Infinity,
                         ease: 'easeInOut'
                     }}
-                    className="absolute inset-0 rounded-full bg-green-500/20 blur-2xl"
+                    className="absolute inset-0 rounded-full bg-emerald-500/20 blur-2xl"
                 />
 
                 {/* Icon container */}
@@ -52,7 +52,7 @@ export function EmptyAutomations() {
                             ease: 'easeInOut'
                         }}
                     >
-                        <Zap className="w-16 h-16 text-green-500" />
+                        <Zap className="w-16 h-16 text-emerald-500" />
                     </motion.div>
                 </div>
 
@@ -74,7 +74,7 @@ export function EmptyAutomations() {
                         }}
                         className="absolute top-1/2 left-1/2"
                     >
-                        <Sparkles className="w-4 h-4 text-green-400" />
+                        <Sparkles className="w-4 h-4 text-emerald-400" />
                     </motion.div>
                 ))}
             </motion.div>
@@ -94,7 +94,7 @@ export function EmptyAutomations() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="text-gray-400 mb-8 max-w-md mx-auto text-sm leading-relaxed"
+                className="text-[#9CA3AF] mb-8 max-w-md mx-auto text-sm leading-relaxed"
             >
                 Start building your first workflow by describing what you want to automate in natural language.
             </motion.p>
@@ -109,7 +109,7 @@ export function EmptyAutomations() {
                     <motion.button
                         whileHover={{ scale: 1.05, y: -2 }}
                         whileTap={{ scale: 0.95 }}
-                        className="px-8 py-4 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold flex items-center gap-2 shadow-lg shadow-green-900/20 hover:shadow-green-500/20 transition-all mx-auto"
+                        className="px-8 py-4 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold flex items-center gap-2 shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/20 transition-all mx-auto"
                     >
                         <Zap className="w-5 h-5" />
                         Create Your First Automation
@@ -130,7 +130,7 @@ export function EmptyAutomations() {
                 transition={{ delay: 0.6 }}
                 className="mt-12 max-w-2xl mx-auto"
             >
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Example Workflows</p>
+                <p className="text-xs font-semibold text-[#4B5563] uppercase tracking-wider mb-4">Example Workflows</p>
                 <div className="grid md:grid-cols-3 gap-3">
                     {[
                         { icon: TrendingUp, text: 'Track stock prices' },
@@ -145,11 +145,11 @@ export function EmptyAutomations() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.7 + i * 0.1 }}
                                 whileHover={{ y: -2, scale: 1.02 }}
-                                className="bg-[#0A0A0A] rounded-lg p-4 border border-white/5 hover:border-green-500/30 transition-all cursor-pointer text-left"
+                                className="bg-[#111111] rounded-lg p-4 border border-[#1F2937] hover:border-emerald-500/30 transition-all cursor-pointer text-left"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-green-500/10">
-                                        <Icon className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                    <div className="p-2 rounded-lg bg-emerald-500/10">
+                                        <Icon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                                     </div>
                                     <span className="text-sm text-gray-300">{example.text}</span>
                                 </div>
@@ -168,7 +168,7 @@ export function EmptySearchResults({ query, onClear }) {
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-16 px-6 font-mono"
+            className="text-center py-16 px-6 font-sans"
         >
             <motion.div
                 initial={{ scale: 0 }}
@@ -179,10 +179,10 @@ export function EmptySearchResults({ query, onClear }) {
                 <Code className="w-10 h-10 text-red-500" />
             </motion.div>
 
-            <h3 className="text-xl font-bold mb-2 text-green-400">
+            <h3 className="text-xl font-bold mb-2 text-emerald-400">
                 {'>'} search.error("no_results")
             </h3>
-            <p className="text-green-700 mb-6 text-sm">
+            <p className="text-[#4B5563] mb-6 text-sm">
                 // Query "{query}" returned 0 matches
             </p>
 
@@ -190,7 +190,7 @@ export function EmptySearchResults({ query, onClear }) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={onClear}
-                className="px-6 py-2 rounded-lg glass border border-green-700 text-green-400 hover:bg-green-900/30 transition-all"
+                className="px-6 py-2 rounded-lg glass border border-emerald-700 text-emerald-400 hover:bg-emerald-900/30 transition-all"
             >
                 Clear Search
             </motion.button>
@@ -204,7 +204,7 @@ export function SuccessCelebration({ message, onClose }) {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm font-mono"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm font-sans"
             onClick={onClose}
         >
             {/* Confetti effect */}
@@ -229,7 +229,7 @@ export function SuccessCelebration({ message, onClose }) {
                         }}
                         className="absolute w-3 h-3 rounded-full"
                         style={{
-                            backgroundColor: ['#22c55e', '#10b981', '#84cc16', '#eab308'][i % 4]
+                            backgroundColor: ['#10B981', '#059669', '#34d399', '#064E3B'][i % 4]
                         }}
                     />
                 ))}
@@ -238,7 +238,7 @@ export function SuccessCelebration({ message, onClose }) {
             <motion.div
                 initial={{ y: 50 }}
                 animate={{ y: 0 }}
-                className="relative glass-strong rounded-2xl p-12 border-2 border-green-500 text-center max-w-md"
+                className="relative glass-strong rounded-2xl p-12 border-2 border-emerald-500 text-center max-w-md"
             >
                 <motion.div
                     animate={{
@@ -246,21 +246,21 @@ export function SuccessCelebration({ message, onClose }) {
                         rotate: [0, 360]
                     }}
                     transition={{ duration: 0.6 }}
-                    className="w-24 h-24 mx-auto mb-6 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center"
+                    className="w-24 h-24 mx-auto mb-6 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center"
                 >
-                    <Rocket className="w-12 h-12 text-green-400" />
+                    <Rocket className="w-12 h-12 text-emerald-400" />
                 </motion.div>
 
-                <h2 className="text-3xl font-bold mb-3 text-green-400">
+                <h2 className="text-3xl font-bold mb-3 text-emerald-400">
                     Success!
                 </h2>
-                <p className="text-green-600 mb-6">{message}</p>
+                <p className="text-[#9CA3AF] mb-6">{message}</p>
 
                 <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={onClose}
-                    className="px-6 py-3 rounded-lg bg-green-900/70 border-2 border-green-700 text-green-300 font-semibold"
+                    className="px-6 py-3 rounded-lg bg-emerald-900/70 border-2 border-emerald-700 text-emerald-300 font-semibold"
                 >
                     Continue
                 </motion.button>

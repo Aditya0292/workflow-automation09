@@ -846,11 +846,59 @@ async def research_twitter(request: TextRequest):
 # Dynamic Code Execution
 # ============================================================
 
+# ─── Dynamic Output Validation Helpers ──────────────────────────────────
+
+def _is_good_result(result: dict) -> bool:
+    """Check if a sandbox execution result is good enough to cache."""
+    if not result.get("success"):
+        return False
+    output = result.get("result", {})
+    # Bad if explicit error key present
+    if output.get("error"):
+        return False
+    # Bad if count is 0 and items is empty
+    if output.get("count", 1) == 0 and not output.get("items"):
+        return False
+    # Bad if summary says "Failed" or "Error"
+    summary = str(output.get("summary", ""))
+    if summary.startswith("Failed") or summary.startswith("Error"):
+        return False
+    return True
+
+
+def _validate_dynamic_output(result: dict) -> tuple:
+    """
+    Validates dynamic execution output.
+    Returns (is_valid, reason_if_invalid)
+    """
+    if not result.get("success"):
+        return False, f"Execution failed: {result.get('error', 'unknown')}"
+
+    output = result.get("result", {})
+
+    # Must have summary for notification steps
+    if "summary" not in output:
+        return False, "Output missing required 'summary' field"
+
+    # Summary must not be an error message
+    summary = str(output.get("summary", ""))
+    if any(bad in summary.lower() for bad in ["failed to fetch", "error:", "exception:", "traceback"]):
+        return False, f"Output summary indicates failure: {summary[:100]}"
+
+    # If it's a list result, must have at least some items
+    if "items" in output and "count" in output:
+        if output["count"] == 0:
+            return False, "Output returned 0 items — possible wrong URL or selectors"
+
+    return True, "ok"
+
+
 @app.post("/execute_dynamic")
 async def execute_dynamic(request: DynamicExecuteRequest):
     """
     Execute dynamically generated Python code in sandbox.
     Used by the Node.js workflow executor for 'dynamic' step types.
+    Validates output quality and conditionally saves to Firestore learned tools.
     """
     try:
         logger.info(f"⚡ Executing dynamic code (len={len(request.generated_code)})")
@@ -859,6 +907,39 @@ async def execute_dynamic(request: DynamicExecuteRequest):
             inputs=request.inputs,
             context=request.context
         )
+
+        # Validate output quality (Fix 3)
+        is_valid, reason = _validate_dynamic_output(result)
+        if not is_valid:
+            logger.warning(f"⚠️ Dynamic output validation failed: {reason}")
+            result["_validation_failed"] = True
+            result["_validation_reason"] = reason
+        else:
+            logger.info("✅ Dynamic output validated successfully")
+
+        # Conditional save to Firestore (Fix 1)
+        # Only save if: result is good + validation passed + request wants to save
+        should_save = (
+            request.context.get("save_as_learned_tool", False)
+            and _is_good_result(result)
+            and not result.get("_validation_failed")
+        )
+
+        if should_save:
+            capability = request.context.get("capability", "")
+            description = request.context.get("description", "")
+            if capability:
+                from dynamic_resolver import _save_learned_tool
+                _save_learned_tool(
+                    capability=capability,
+                    description=description,
+                    generated_code=request.generated_code,
+                    inputs=request.inputs
+                )
+                logger.info(f"💾 Saved learned tool after successful execution: {capability}")
+        elif request.context.get("save_as_learned_tool", False):
+            logger.warning(f"⚠️ Skipped saving learned tool — result did not pass quality checks")
+
         return result
     except Exception as e:
         logger.error(f"❌ Dynamic execution failed: {str(e)}")
@@ -872,3 +953,4 @@ async def execute_dynamic(request: DynamicExecuteRequest):
 # ============================================================
 # Run with: uvicorn app:app --reload --port 8000
 # ============================================================
+

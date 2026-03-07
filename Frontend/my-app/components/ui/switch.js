@@ -21,7 +21,7 @@ export function Switch({ defaultChecked = false, onCheckedChange, disabled = fal
             aria-checked={checked}
             disabled={disabled}
             onClick={handleToggle}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:ring-offset-2 focus:ring-offset-black ${checked ? 'bg-green-600' : 'bg-gray-700'
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:ring-offset-2 focus:ring-offset-black ${checked ? 'bg-emerald-500' : 'bg-gray-700'
                 } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             {...props}
         >

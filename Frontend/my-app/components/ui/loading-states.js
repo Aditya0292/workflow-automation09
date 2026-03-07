@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader, Sparkles, Zap, Terminal } from 'lucide-react';
 
@@ -16,13 +17,13 @@ export function LoadingSpinner({ size = 'md', text = '' }) {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
             >
-                <Loader className={`${sizes[size]} text-green-500`} />
+                <Loader className={`${sizes[size]} text-emerald-500`} />
             </motion.div>
             {text && (
                 <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-sm text-green-600 font-mono"
+                    className="text-sm text-emerald-400 font-sans"
                 >
                     {text}
                 </motion.p>
@@ -34,7 +35,7 @@ export function LoadingSpinner({ size = 'md', text = '' }) {
 export function AIThinkingLoader({ message = 'AI is processing your request...' }) {
     return (
         <div className="flex items-center justify-center py-12">
-            <div className="glass-strong rounded-2xl p-8 border border-green-700/50 max-w-md w-full">
+            <div className="glass-strong rounded-2xl p-8 border border-emerald-700/50 max-w-md w-full">
                 <div className="flex items-center gap-4">
                     {/* Animated AI Brain */}
                     <motion.div
@@ -43,15 +44,15 @@ export function AIThinkingLoader({ message = 'AI is processing your request...' 
                             rotate: [0, 5, -5, 0]
                         }}
                         transition={{ duration: 2, repeat: Infinity }}
-                        className="w-16 h-16 rounded-full bg-gradient-to-br from-green-900/50 to-emerald-900/50 border-2 border-green-500 flex items-center justify-center"
+                        className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-900/50 to-emerald-900/50 border-2 border-emerald-500 flex items-center justify-center"
                     >
-                        <Sparkles className="w-8 h-8 text-green-400" />
+                        <Sparkles className="w-8 h-8 text-emerald-400" />
                     </motion.div>
 
                     {/* Loading Text with Dots */}
                     <div className="flex-1">
                         <motion.p
-                            className="text-green-400 font-mono mb-2"
+                            className="text-emerald-400 font-sans mb-2"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                         >
@@ -70,7 +71,7 @@ export function AIThinkingLoader({ message = 'AI is processing your request...' 
                                         repeat: Infinity,
                                         delay: i * 0.2
                                     }}
-                                    className="w-2 h-2 rounded-full bg-green-500"
+                                    className="w-2 h-2 rounded-full bg-emerald-500"
                                 />
                             ))}
                         </div>
@@ -82,7 +83,7 @@ export function AIThinkingLoader({ message = 'AI is processing your request...' 
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: 1 }}
                     transition={{ duration: 2, repeat: Infinity }}
-                    className="h-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full mt-4 origin-left"
+                    className="h-1 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full mt-4 origin-left"
                 />
             </div>
         </div>
@@ -107,17 +108,17 @@ export function ProgressBar({ progress = 0, steps = [], currentStep = 0 }) {
                                 scale: index === currentStep ? [1, 1.1, 1] : 1
                             }}
                             transition={{ duration: 0.5 }}
-                            className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-mono text-sm ${index < currentStep
-                                    ? 'bg-green-500 border-green-500 text-black'
-                                    : index === currentStep
-                                        ? 'border-green-500 text-green-400 bg-green-900/30'
-                                        : 'border-green-900 text-green-800 bg-black/30'
+                            className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-sans text-sm ${index < currentStep
+                                ? 'bg-emerald-500 border-emerald-500 text-black'
+                                : index === currentStep
+                                    ? 'border-emerald-500 text-emerald-400 bg-emerald-900/30'
+                                    : 'border-emerald-900 text-emerald-800 bg-black/30'
                                 }`}
                         >
                             {index < currentStep ? '✓' : index + 1}
                         </motion.div>
                         <span
-                            className={`text-xs font-mono ${index <= currentStep ? 'text-green-400' : 'text-green-800'
+                            className={`text-xs font-sans ${index <= currentStep ? 'text-emerald-400' : 'text-emerald-800'
                                 }`}
                         >
                             {step}
@@ -127,12 +128,12 @@ export function ProgressBar({ progress = 0, steps = [], currentStep = 0 }) {
             </div>
 
             {/* Progress Bar */}
-            <div className="relative h-2 bg-green-950 rounded-full overflow-hidden">
+            <div className="relative h-2 bg-emerald-950 rounded-full overflow-hidden">
                 <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.5, ease: 'easeOut' }}
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full"
                 />
             </div>
 
@@ -140,7 +141,7 @@ export function ProgressBar({ progress = 0, steps = [], currentStep = 0 }) {
             <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-right text-sm text-green-600 font-mono mt-2"
+                className="text-right text-sm text-[#9CA3AF] font-sans mt-2"
             >
                 {progress}% complete
             </motion.p>
@@ -156,14 +157,14 @@ export function PulseLoader() {
                     key={i}
                     animate={{
                         scale: [1, 1.5, 1],
-                        backgroundColor: ['#16a34a', '#22c55e', '#16a34a']
+                        backgroundColor: ['#10B981', '#059669', '#10B981']
                     }}
                     transition={{
                         duration: 1,
                         repeat: Infinity,
                         delay: i * 0.15
                     }}
-                    className="w-3 h-3 rounded-full bg-green-500"
+                    className="w-3 h-3 rounded-full bg-emerald-500"
                 />
             ))}
         </div>
@@ -183,10 +184,10 @@ export function TerminalLoader({ commands = [] }) {
     }, [currentCommand, commands]);
 
     return (
-        <div className="glass-strong rounded-xl p-6 border border-green-700/50 font-mono max-w-2xl mx-auto">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-green-900">
-                <Terminal className="w-4 h-4 text-green-500" />
-                <span className="text-xs text-green-600">terminal</span>
+        <div className="glass-strong rounded-xl p-6 border border-emerald-700/50 font-mono max-w-2xl mx-auto">
+            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-emerald-900">
+                <Terminal className="w-4 h-4 text-emerald-500" />
+                <span className="text-xs text-emerald-600">terminal</span>
             </div>
 
             <div className="space-y-2">
@@ -197,13 +198,13 @@ export function TerminalLoader({ commands = [] }) {
                         animate={{ opacity: 1, x: 0 }}
                         className="flex items-center gap-2"
                     >
-                        <span className="text-green-500">$</span>
-                        <span className="text-green-400">{cmd}</span>
+                        <span className="text-emerald-500">$</span>
+                        <span className="text-emerald-400">{cmd}</span>
                         {index === currentCommand && (
                             <motion.span
                                 animate={{ opacity: [1, 0] }}
                                 transition={{ duration: 0.8, repeat: Infinity }}
-                                className="inline-block w-2 h-4 bg-green-500"
+                                className="inline-block w-2 h-4 bg-emerald-500"
                             />
                         )}
                     </motion.div>
@@ -212,6 +213,3 @@ export function TerminalLoader({ commands = [] }) {
         </div>
     );
 }
-
-// Import useState and useEffect
-import { useState, useEffect } from 'react';

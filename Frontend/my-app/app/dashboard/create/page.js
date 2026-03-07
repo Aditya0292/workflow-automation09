@@ -14,6 +14,20 @@ import { Button } from '@/components/ui/button';
 import { AIThinkingLoader, ProgressBar } from '@/components/ui/loading-states';
 import api from '@/lib/api';
 
+// Step type to label mapping
+const STEP_LABELS = {
+    'dynamic': 'AI Generated',
+    'send_email': 'Send Email',
+    'send_gmail': 'Send via Gmail',
+    'format_web_digest': 'Format Digest',
+    'append_google_sheet': 'Save to Sheets',
+    'fetch_stock_price': 'Fetch Stock',
+    'fetch_weather': 'Fetch Weather',
+    'send_whatsapp': 'WhatsApp Alert',
+};
+
+const getStepLabel = (type) => STEP_LABELS[type] || 'Action Step';
+
 export default function CreateAutomationPage() {
     const [description, setDescription] = useState('');
     const [generatedAutomation, setGeneratedAutomation] = useState(null);
@@ -134,10 +148,9 @@ export default function CreateAutomationPage() {
     };
 
     const examplePrompts = [
-        "Send me an email every morning with stock prices for AAPL and GOOGL",
-        "Email me my GitHub stars summary every Monday",
-        "Track Apple stock and sms if it drops below $150.",
-        "Notify me with weather updates of Mumbai everyday at 9AM"
+        "Fetch Times of India news and email me a summary daily",
+        "Track NIFTY 50 price every hour and save to Google Sheets",
+        "Send me top AI stories from HackerNews every morning"
     ];
 
     return (
@@ -149,7 +162,7 @@ export default function CreateAutomationPage() {
                 className="mb-8"
             >
                 <h1 className="text-3xl font-bold mb-2 text-white">Create Automation</h1>
-                <p className="text-gray-400 text-sm">Describe your workflow in natural language, and AI will build it for you.</p>
+                <p className="text-[#9CA3AF] text-sm">Type anything. If a tool doesn't exist, the AI builds it on the fly.</p>
             </motion.div>
 
             <div className="grid lg:grid-cols-2 gap-8">
@@ -159,9 +172,9 @@ export default function CreateAutomationPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 }}
                 >
-                    <div className="bg-[#0A0A0A] rounded-2xl p-8 border border-white/5 shadow-2xl shadow-black/50">
+                    <div className="bg-[#0A0A0A] rounded-2xl p-8 border border-[#1F2937] shadow-2xl shadow-black/50">
                         <div className="flex items-center gap-2 mb-6">
-                            <Sparkles className="w-5 h-5 text-green-500" />
+                            <Sparkles className="w-5 h-5 text-emerald-500" />
                             <h2 className="text-xl font-bold text-white">Describe Workflow</h2>
                         </div>
 
@@ -173,8 +186,8 @@ export default function CreateAutomationPage() {
                             <textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Example: Send me an email every day at 9 AM with the weather forecast..."
-                                className="w-full h-40 px-4 py-3 rounded-lg bg-black/40 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all resize-none text-sm"
+                                placeholder={"Describe any automation in plain English...\ne.g. 'Fetch Times of India news and email me a summary every morning'"}
+                                className="w-full h-40 px-4 py-3 rounded-lg bg-black/40 border border-[#1F2937] text-white placeholder-[#4B5563] focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-none text-sm"
                                 disabled={loading || step !== 'input'}
                             />
                             {error && (
@@ -189,7 +202,7 @@ export default function CreateAutomationPage() {
                             )}
                         </div>
 
-                        {/* Example Prompts */}
+                        {/* Example Prompts - "Try these examples" */}
                         {step === 'input' && (
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -197,20 +210,17 @@ export default function CreateAutomationPage() {
                                 transition={{ delay: 0.2 }}
                                 className="mb-6"
                             >
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Try an example</p>
-                                <div className="space-y-2">
+                                <p className="text-xs font-semibold text-[#4B5563] uppercase tracking-wider mb-3">Try these examples</p>
+                                <div className="flex flex-wrap gap-2">
                                     {examplePrompts.map((prompt, i) => (
                                         <motion.button
                                             key={i}
-                                            whileHover={{ scale: 1.01, x: 2 }}
-                                            whileTap={{ scale: 0.99 }}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
                                             onClick={() => setDescription(prompt)}
-                                            className="w-full text-left p-3 rounded-lg bg-white/5 border border-white/5 hover:border-green-500/30 text-sm text-gray-400 hover:text-white transition-all group"
+                                            className="px-3 py-1.5 rounded-full border border-emerald-500/30 text-xs text-[#9CA3AF] hover:text-white hover:bg-[#064E3B] transition-all"
                                         >
-                                            <div className="flex items-start gap-2">
-                                                <Zap className="w-3.5 h-3.5 text-gray-600 group-hover:text-green-500 transition-colors flex-shrink-0 mt-0.5" />
-                                                <span className="line-clamp-1">{prompt}</span>
-                                            </div>
+                                            {prompt}
                                         </motion.button>
                                     ))}
                                 </div>
@@ -223,7 +233,7 @@ export default function CreateAutomationPage() {
                                 <Button
                                     onClick={handleGenerate}
                                     disabled={loading || !description.trim()}
-                                    className="w-full bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20 h-11"
+                                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 h-11"
                                 >
                                     {loading ? (
                                         <>
@@ -241,10 +251,10 @@ export default function CreateAutomationPage() {
 
                             {step === 'preview' && (
                                 <>
-                                    <Button onClick={handleReset} variant="outline" className="flex-1 bg-transparent border-white/10 text-white hover:bg-white/5">
+                                    <Button onClick={handleReset} variant="outline" className="flex-1 bg-transparent border-[#1F2937] text-white hover:bg-white/5">
                                         Cancel
                                     </Button>
-                                    <Button onClick={handleSave} disabled={loading} className="flex-1 bg-green-600 hover:bg-green-500 text-white">
+                                    <Button onClick={handleSave} disabled={loading} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white">
                                         {loading ? (
                                             <>
                                                 <Loader className="w-5 h-5 mr-2 animate-spin" />
@@ -277,27 +287,32 @@ export default function CreateAutomationPage() {
                         )}
                     </div>
 
-                    {/* Tips */}
+                    {/* Try these examples section (replaces Pro Tips) */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.3 }}
-                        className="mt-6 p-6 rounded-xl border border-white/5 bg-white/5"
+                        className="mt-6 p-6 rounded-xl border border-[#1F2937] bg-white/5"
                     >
-                        <h3 className="text-sm font-semibold text-green-500 mb-3 flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-emerald-500 mb-3 flex items-center gap-2">
                             <Sparkles className="w-4 h-4" />
-                            Pro Tips
+                            Try these examples
                         </h3>
-                        <ul className="space-y-2 text-sm text-gray-400">
-                            <li className="flex items-start gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5" />
-                                <span>Be specific about timing (e.g., "every day at 9 AM")</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5" />
-                                <span>Mention inputs and outputs clearly</span>
-                            </li>
-                        </ul>
+                        <div className="space-y-2">
+                            {[
+                                "Fetch Times of India news and email me a summary daily",
+                                "Track NIFTY 50 price every hour and save to Google Sheets",
+                                "Send me top AI stories from HackerNews every morning"
+                            ].map((prompt, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setDescription(prompt)}
+                                    className="w-full text-left px-3 py-2 rounded-lg border border-emerald-500/20 text-sm text-[#9CA3AF] hover:text-white hover:bg-[#064E3B] transition-all"
+                                >
+                                    {prompt}
+                                </button>
+                            ))}
+                        </div>
                     </motion.div>
                 </motion.div>
 
@@ -315,14 +330,14 @@ export default function CreateAutomationPage() {
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                className="bg-[#0A0A0A] rounded-2xl p-8 border border-white/5 shadow-2xl relative overflow-hidden"
+                                className="bg-[#0A0A0A] rounded-2xl p-8 border border-[#1F2937] shadow-2xl relative overflow-hidden"
                             >
                                 <div className="absolute top-0 right-0 p-4 opacity-5">
                                     <Code className="w-32 h-32" />
                                 </div>
 
                                 <div className="flex items-center gap-2 mb-8 relative z-10">
-                                    <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
+                                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500">
                                         <Eye className="w-5 h-5" />
                                     </div>
                                     <h2 className="text-xl font-bold text-white">Blueprint Preview</h2>
@@ -330,41 +345,51 @@ export default function CreateAutomationPage() {
 
                                 {/* Automation Details */}
                                 <div className="space-y-6 mb-8 relative z-10">
-                                    <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
+                                    <div className="p-4 rounded-xl bg-white/5 border border-[#1F2937]">
+                                        <label className="text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1 block">Name</label>
                                         <p className="text-lg font-semibold text-white">{generatedAutomation.name || 'Untitled Automation'}</p>
                                     </div>
 
                                     <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Workflow Steps</label>
+                                        <label className="text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-2 block">Workflow Steps</label>
                                         <div className="space-y-0">
-                                            {generatedAutomation.steps?.map((step, index) => (
-                                                <div key={index} className="flex gap-4">
-                                                    <div className="flex flex-col items-center">
-                                                        <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold text-white z-10 box-content border-4 border-[#0A0A0A]">
-                                                            {index + 1}
+                                            {generatedAutomation.steps?.map((stepItem, index) => {
+                                                const isDynamic = stepItem.type === 'dynamic';
+                                                return (
+                                                    <div key={index} className={`flex gap-4 ${isDynamic ? 'border-l-[3px] border-l-emerald-400 pl-0 ml-0' : ''}`}>
+                                                        <div className="flex flex-col items-center">
+                                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white z-10 box-content border-4 border-[#0A0A0A] ${isDynamic ? 'bg-emerald-500' : 'bg-[#1F2937]'}`}>
+                                                                {index + 1}
+                                                            </div>
+                                                            {index < (generatedAutomation.steps?.length || 0) - 1 && (
+                                                                <div className="w-0.5 flex-1 bg-white/10 min-h-[20px]" />
+                                                            )}
                                                         </div>
-                                                        {index < (generatedAutomation.steps?.length || 0) - 1 && (
-                                                            <div className="w-0.5 flex-1 bg-white/10 min-h-[20px]" />
-                                                        )}
+                                                        <div className="pb-6 pt-0.5">
+                                                            <div className="flex items-center gap-2">
+                                                                <h4 className="font-semibold text-white text-sm">{getStepLabel(stepItem.type)}</h4>
+                                                                {isDynamic && (
+                                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#064E3B] text-emerald-300">
+                                                                        AI ✨
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-[#9CA3AF] mt-1">{stepItem.description || getStepLabel(stepItem.type)}</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="pb-6 pt-0.5">
-                                                        <h4 className="font-semibold text-white text-sm">{step.type}</h4>
-                                                        <p className="text-xs text-gray-400 mt-1">{step.description || 'Action step'}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* JSON View (Collapsible) */}
                                 <details className="relative z-10 group">
-                                    <summary className="cursor-pointer text-xs font-semibold text-gray-500 hover:text-white transition flex items-center gap-2 select-none">
+                                    <summary className="cursor-pointer text-xs font-semibold text-[#4B5563] hover:text-white transition flex items-center gap-2 select-none">
                                         <Code className="w-3 h-3" />
                                         Show Configuration JSON
                                     </summary>
-                                    <pre className="mt-3 p-4 rounded-lg bg-black border border-white/10 text-[10px] text-green-400 font-mono overflow-auto max-h-48">
+                                    <pre className="mt-3 p-4 rounded-lg bg-black border border-[#1F2937] text-[10px] text-emerald-400 font-mono overflow-auto max-h-48">
                                         {JSON.stringify(generatedAutomation, null, 2)}
                                     </pre>
                                 </details>
@@ -375,16 +400,16 @@ export default function CreateAutomationPage() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="bg-[#0A0A0A] rounded-2xl p-12 border border-white/5 text-center flex flex-col items-center justify-center h-full min-h-[400px]"
+                                className="bg-[#0A0A0A] rounded-2xl p-12 border border-[#1F2937] text-center flex flex-col items-center justify-center h-full min-h-[400px]"
                             >
                                 <div className="w-24 h-24 mb-6 relative">
-                                    <div className="absolute inset-0 bg-green-500 blur-2xl opacity-20 animate-pulse" />
-                                    <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-white/5 to-transparent border border-white/10 flex items-center justify-center">
-                                        <Sparkles className="w-10 h-10 text-green-500" />
+                                    <div className="absolute inset-0 bg-emerald-500 blur-2xl opacity-20 animate-pulse" />
+                                    <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-white/5 to-transparent border border-[#1F2937] flex items-center justify-center">
+                                        <Sparkles className="w-10 h-10 text-emerald-500" />
                                     </div>
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-2">Ready to Build</h3>
-                                <p className="text-sm text-gray-400 max-w-xs mx-auto">
+                                <p className="text-sm text-[#9CA3AF] max-w-xs mx-auto">
                                     Describe your automation on the left, and watch the AI construct it here in real-time.
                                 </p>
                             </motion.div>

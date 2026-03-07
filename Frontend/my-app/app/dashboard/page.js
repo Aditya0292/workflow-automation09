@@ -2,46 +2,62 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Clock, LayoutGrid, Zap, Shield, Play, Pause, Trash2, Edit, List, Calendar, CheckCircle } from 'lucide-react';
+import { Plus, Clock, LayoutGrid, Zap, Shield, Play, Pause, Trash2, Edit, List, Calendar, CheckCircle, Activity, Settings2 } from 'lucide-react';
 import { EmptyAutomations } from '@/components/ui/empty-states';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
+import { useDashboardCache } from '@/providers/dashboard-cache-provider';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
-// Stats Card Component - matching the screenshot exactly
-const StatCard = ({ icon: Icon, label, value, subtext, iconBgColor = "bg-green-500/10", iconColor = "text-green-500" }) => (
+// Stats Card Component - clean icon-based design
+const StatCard = ({ icon: Icon, label, value, subtext, isHighlighted = false }) => (
     <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-[#111] border border-white/5 p-6 rounded-2xl relative overflow-hidden group hover:border-white/10 transition-colors"
+        className={`bg-[#111111] border border-[#1F2937] p-6 rounded-2xl relative overflow-hidden group hover:border-emerald-500/20 transition-colors ${isHighlighted ? 'border-b-2 border-b-emerald-500' : ''}`}
     >
-        {/* Large background icon on the right */}
-        <div className="absolute top-1/2 right-4 -translate-y-1/2 opacity-10">
-            <div className={`w-20 h-20 rounded-full border-4 ${iconColor.replace('text-', 'border-')} flex items-center justify-center`}>
-                <Icon className={`w-10 h-10 ${iconColor}`} />
-            </div>
-        </div>
-
         <div className="relative z-10">
-            <div className={`inline-flex p-1.5 rounded-lg ${iconBgColor} mb-4`}>
-                <Icon className={`w-4 h-4 ${iconColor}`} />
+            {/* Icon in emerald-tinted circle */}
+            <div className="w-10 h-10 rounded-full bg-[#064E3B] flex items-center justify-center mb-4">
+                <Icon className="w-4 h-4 text-emerald-500" />
             </div>
 
             <h3 className="text-4xl font-bold text-white mb-1">{value}</h3>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{label}</p>
-            <p className="text-xs text-gray-600">{subtext}</p>
+            <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-1">{label}</p>
+            <p className="text-xs text-[#4B5563]">{subtext}</p>
         </div>
     </motion.div>
 );
 
+// Format date to cleaner format
+const formatLastRun = (dateStr) => {
+    if (!dateStr) return 'No runs yet';
+    const date = new Date(dateStr);
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+
+    if (isToday) {
+        return `Last run: Today at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+    }
+
+    return `Last run: ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+};
+
 export default function DashboardPage() {
-    const [automations, setAutomations] = useState([]);
-    const [executions, setExecutions] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+    const {
+        automations,
+        executions,
+        loading,
+        loadAutomations,
+        refreshSilent,
+        updateAutomationStatus,
+        removeAutomation,
+        updateAutomation,
+    } = useDashboardCache();
+    const [viewMode, setViewMode] = useState('grid');
     const [selectedIds, setSelectedIds] = useState([]);
     const { user, isAuthenticated, loading: authLoading } = useAuth();
     const { success, error: showError } = useToast();
@@ -53,81 +69,49 @@ export default function DashboardPage() {
             router.push('/login');
             return;
         }
+        // Uses cached data if available (60s TTL)
         loadAutomations();
-    }, [isAuthenticated, authLoading, router]);
-
-    const loadAutomations = async () => {
-        try {
-            setLoading(true);
-            const data = await api.getAutomations();
-
-            const automationData = data.automations || [];
-            let totalExecutions = 0;
-            let dailyExecutions = 0;
-            const today = new Date().toDateString();
-
-            const enrichedAutomations = await Promise.all(automationData.map(async (auto) => {
-                try {
-                    const execs = await api.getAutomationExecutions(auto.id);
-                    totalExecutions += execs.length;
-
-                    // Count daily executions
-                    const todayExecs = execs.filter(e => new Date(e.created_at).toDateString() === today).length;
-                    dailyExecutions += todayExecs;
-
-                    return { ...auto, lastRun: execs[0]?.created_at, executionCount: execs.length };
-                } catch (e) {
-                    return { ...auto, executionCount: 0 };
-                }
-            }));
-
-            setAutomations(enrichedAutomations);
-            setExecutions({ total: totalExecutions, daily: dailyExecutions });
-        } catch (error) {
-            console.error('Failed to load automations:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [isAuthenticated, authLoading, router, loadAutomations]);
 
     const handleToggle = async (id, currentStatus) => {
         const newStatus = currentStatus === 'active' ? 'paused' : 'active';
         try {
-            setAutomations(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
+            // Optimistic update via cache
+            updateAutomationStatus(id, newStatus);
             await api.updateAutomationStatus(id, newStatus);
             success(`Automation ${newStatus === 'active' ? 'activated' : 'paused'}`);
         } catch (error) {
             showError('Failed to update status');
-            loadAutomations();
+            // Revert silently in background
+            refreshSilent();
         }
     };
 
     const handleDelete = async (id) => {
         if (confirm('Delete this automation?')) {
             try {
+                // Optimistic remove from cache
+                removeAutomation(id);
                 await api.deleteAutomation(id);
                 success('Automation deleted');
-                loadAutomations();
             } catch (error) {
                 showError('Failed to delete automation');
+                refreshSilent();
             }
         }
     };
 
     const handleTestRun = async (id, name) => {
         try {
-            setAutomations(prev => prev.map(a =>
-                a.id === id ? { ...a, isTestRunning: true } : a
-            ));
+            updateAutomation(id, { isTestRunning: true });
             await api.runAutomation(id);
             success(`Test run started for "${name}"`);
-            // Refresh after a delay to show execution
-            setTimeout(() => loadAutomations(), 2000);
+            updateAutomation(id, { isTestRunning: false });
+            // Silently refresh data in background after a delay
+            setTimeout(() => refreshSilent(), 3000);
         } catch (error) {
             showError('Failed to start test run');
-            setAutomations(prev => prev.map(a =>
-                a.id === id ? { ...a, isTestRunning: false } : a
-            ));
+            updateAutomation(id, { isTestRunning: false });
         }
     };
 
@@ -149,13 +133,14 @@ export default function DashboardPage() {
         if (selectedIds.length === 0) return;
         if (confirm(`Delete ${selectedIds.length} automations?`)) {
             try {
+                // Optimistic removal
+                selectedIds.forEach(id => removeAutomation(id));
                 await Promise.all(selectedIds.map(id => api.deleteAutomation(id)));
                 success(`${selectedIds.length} automations deleted`);
                 setSelectedIds([]);
-                loadAutomations();
             } catch (error) {
                 showError('Failed to delete some automations');
-                loadAutomations();
+                refreshSilent();
             }
         }
     };
@@ -169,14 +154,17 @@ export default function DashboardPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-white mb-1">Dashboard</h1>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500">Status:</span>
-                        <span className="text-sm font-bold text-green-500">ONLINE</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-sm text-[#4B5563]">Status:</span>
+                        <span className="text-sm font-bold text-emerald-500">ONLINE</span>
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
                     </div>
                 </div>
 
                 <Link href="/dashboard/create">
-                    <Button className="bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20 font-semibold">
+                    <Button className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 font-semibold">
                         <Plus className="w-4 h-4 mr-2" />
                         Create Automation
                     </Button>
@@ -186,36 +174,29 @@ export default function DashboardPage() {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                 <StatCard
-                    icon={Clock}
+                    icon={Zap}
                     label="TOTAL EXECUTIONS"
                     value={executions.total || 0}
                     subtext="Processing Time: 840ms avg"
-                    iconBgColor="bg-green-500/10"
-                    iconColor="text-green-500"
                 />
                 <StatCard
                     icon={LayoutGrid}
                     label="ACTIVE WORKFLOWS"
                     value={activeCount}
                     subtext={`${automations.length} Total Definitions`}
-                    iconBgColor="bg-cyan-500/10"
-                    iconColor="text-cyan-500"
                 />
                 <StatCard
-                    icon={Zap}
+                    icon={Activity}
                     label="DAILY EXECUTIONS"
                     value={executions.daily || 0}
                     subtext="Runs in last 24h"
-                    iconBgColor="bg-yellow-500/10"
-                    iconColor="text-yellow-500"
                 />
                 <StatCard
-                    icon={Shield}
+                    icon={Settings2}
                     label="TOTAL AUTOMATIONS"
                     value={automations.length}
                     subtext="All created workflows"
-                    iconBgColor="bg-emerald-500/10"
-                    iconColor="text-emerald-500"
+                    isHighlighted={true}
                 />
             </div>
 
@@ -224,7 +205,7 @@ export default function DashboardPage() {
                     <h2 className="text-lg font-bold text-white">Active Workflows</h2>
 
                     {/* Bulk Selection Actions */}
-                    <div className="flex items-center gap-3 pl-4 border-l border-white/10">
+                    <div className="flex items-center gap-3 pl-4 border-l border-[#1F2937]">
                         <label className="flex items-center gap-2 cursor-pointer group">
                             <div className="relative flex items-center">
                                 <input
@@ -233,11 +214,11 @@ export default function DashboardPage() {
                                     onChange={toggleSelectAll}
                                     className="peer h-4 w-4 opacity-0 absolute cursor-pointer"
                                 />
-                                <div className="h-4 w-4 border border-white/20 rounded bg-white/5 peer-checked:bg-green-500 peer-checked:border-green-500 transition-all flex items-center justify-center">
+                                <div className="h-4 w-4 border border-[#1F2937] rounded bg-white/5 peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all flex items-center justify-center">
                                     <CheckCircle className={`w-3 h-3 text-black font-bold ${selectedIds.length === automations.length ? 'block' : 'hidden'}`} />
                                 </div>
                             </div>
-                            <span className="text-xs font-medium text-gray-400 group-hover:text-white transition-colors uppercase tracking-wider">Select All</span>
+                            <span className="text-xs font-medium text-[#9CA3AF] group-hover:text-white transition-colors uppercase tracking-wider">Select All</span>
                         </label>
 
                         {selectedIds.length > 0 && (
@@ -253,16 +234,16 @@ export default function DashboardPage() {
                         )}
                     </div>
                 </div>
-                <div className="flex gap-1 bg-[#111] p-1 rounded-lg border border-white/5">
+                <div className="flex gap-1 bg-[#111111] p-1 rounded-lg border border-[#1F2937]">
                     <button
                         onClick={() => setViewMode('grid')}
-                        className={`p-2 rounded transition ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                        className={`p-2 rounded transition ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-[#4B5563] hover:text-white hover:bg-white/5'}`}
                     >
                         <LayoutGrid className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => setViewMode('list')}
-                        className={`p-2 rounded transition ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                        className={`p-2 rounded transition ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-[#4B5563] hover:text-white hover:bg-white/5'}`}
                     >
                         <List className="w-4 h-4" />
                     </button>
@@ -271,102 +252,179 @@ export default function DashboardPage() {
 
             {loading ? (
                 <div className="text-center py-20">
-                    <div className="w-8 h-8 mx-auto border-2 border-green-500 border-t-transparent rounded-full animate-spin mb-4" />
-                    <p className="text-gray-500">Loading your workspace...</p>
+                    <div className="w-8 h-8 mx-auto border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
+                    <p className="text-[#4B5563]">Loading your workspace...</p>
                 </div>
             ) : automations.length === 0 ? (
                 <EmptyAutomations />
             ) : (
-                <div className="space-y-4">
+                <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : 'space-y-3'}>
                     {automations.map((automation) => (
                         <div
                             key={automation.id}
-                            className="bg-[#111] border border-white/5 rounded-xl p-6 group hover:border-green-500/30 transition-all"
+                            className={`bg-[#111111] border border-[#1F2937] rounded-xl p-6 group hover:border-emerald-500/30 transition-all ${automation.status === 'active' ? 'border-l-2 border-l-emerald-500' : ''}`}
                         >
-                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                <div className="flex items-start gap-4 flex-1">
-                                    {/* Selection Checkbox */}
-                                    <div className="pt-1">
-                                        <label className="relative flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(automation.id)}
-                                                onChange={() => toggleSelect(automation.id)}
-                                                className="peer h-4 w-4 opacity-0 absolute cursor-pointer"
-                                            />
-                                            <div className="h-4 w-4 border border-white/20 rounded bg-white/5 peer-checked:bg-green-500 peer-checked:border-green-500 transition-all flex items-center justify-center">
-                                                <CheckCircle className={`w-3 h-3 text-black font-bold ${selectedIds.includes(automation.id) ? 'block' : 'hidden'}`} />
-                                            </div>
-                                        </label>
-                                    </div>
-
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <h3 className="text-lg font-semibold text-white">{automation.name}</h3>
-                                            {automation.status === 'paused' && (
-                                                <span className="px-2 py-1 rounded text-[10px] bg-orange-500/10 text-orange-500 font-bold border border-orange-500/20 uppercase flex items-center gap-1">
-                                                    <Pause className="w-3 h-3" /> Paused
-                                                </span>
-                                            )}
-                                            {automation.status === 'active' && (
-                                                <span className="px-2 py-1 rounded text-[10px] bg-green-500/10 text-green-500 font-bold border border-green-500/20 uppercase flex items-center gap-1">
-                                                    <Play className="w-3 h-3 fill-green-500" /> Active
-                                                </span>
-                                            )}
+                            {viewMode === 'grid' ? (
+                                /* Grid View - Compact card */
+                                <div className="flex flex-col h-full">
+                                    <div className="flex items-start justify-between gap-2 mb-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <label className="relative flex items-center cursor-pointer shrink-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(automation.id)}
+                                                    onChange={() => toggleSelect(automation.id)}
+                                                    className="peer h-4 w-4 opacity-0 absolute cursor-pointer"
+                                                />
+                                                <div className="h-4 w-4 border border-[#1F2937] rounded bg-white/5 peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all flex items-center justify-center">
+                                                    <CheckCircle className={`w-3 h-3 text-black font-bold ${selectedIds.includes(automation.id) ? 'block' : 'hidden'}`} />
+                                                </div>
+                                            </label>
+                                            <div className={`w-2 h-2 rounded-full shrink-0 ${automation.status === 'active' ? 'bg-emerald-500' : 'bg-[#4B5563]'}`} />
+                                            <h3 className="text-base font-semibold text-white truncate">{automation.name}</h3>
                                         </div>
-                                        <p className="text-gray-400 text-sm mb-4 line-clamp-2 max-w-2xl">
-                                            {automation.description || 'No description provided.'}
-                                        </p>
-
-                                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                                            <span className="flex items-center gap-1.5">
-                                                <Clock className="w-3.5 h-3.5" />
-                                                {automation.lastRun ? `Last run: ${new Date(automation.lastRun).toLocaleDateString()}` : 'No runs yet'}
+                                        {automation.status === 'active' && (
+                                            <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-500 font-bold border border-emerald-500/20 uppercase shrink-0">
+                                                Active
                                             </span>
-                                        </div>
+                                        )}
+                                        {automation.status === 'paused' && (
+                                            <span className="px-2 py-0.5 rounded text-[10px] bg-orange-500/10 text-orange-500 font-bold border border-orange-500/20 uppercase shrink-0">
+                                                Paused
+                                            </span>
+                                        )}
                                     </div>
 
-                                    <div className="flex items-center gap-3">
-                                        {/* Activate/Pause Button */}
-                                        <Button
-                                            onClick={() => handleToggle(automation.id, automation.status)}
-                                            className={`h-9 px-4 text-xs font-semibold ${automation.status === 'active'
-                                                ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border border-yellow-500/20'
-                                                : 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20'
-                                                }`}
-                                        >
-                                            {automation.status === 'active' ? (
-                                                <><Pause className="w-3.5 h-3.5 mr-1.5" /> Pause</>
-                                            ) : (
-                                                <><Play className="w-3.5 h-3.5 mr-1.5 fill-white" /> Activate</>
-                                            )}
-                                        </Button>
+                                    <p className="text-[#9CA3AF] text-sm mb-4 line-clamp-2 flex-1">
+                                        {automation.description || 'No description provided.'}
+                                    </p>
 
-                                        {/* Action Icons */}
-                                        <div className="flex items-center gap-0.5 bg-black/40 p-1 rounded-lg border border-white/5">
+                                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-[#1F2937]">
+                                        <span className="flex items-center gap-1.5 text-xs text-[#4B5563]">
+                                            <Clock className="w-3.5 h-3.5" />
+                                            {formatLastRun(automation.lastRun)}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                onClick={() => handleToggle(automation.id, automation.status)}
+                                                className={`h-7 px-2.5 text-[10px] font-semibold ${automation.status === 'active'
+                                                    ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border border-yellow-500/20'
+                                                    : 'bg-transparent border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10'
+                                                    }`}
+                                            >
+                                                {automation.status === 'active' ? 'Pause' : 'Activate'}
+                                            </Button>
                                             <button
                                                 onClick={() => handleTestRun(automation.id, automation.name)}
                                                 disabled={automation.isTestRunning}
-                                                className="p-2 text-gray-500 hover:text-green-500 hover:bg-green-500/10 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                                title="Test Run (Run Once)"
+                                                className="p-1.5 text-[#4B5563] hover:text-emerald-500 hover:bg-emerald-500/10 rounded transition disabled:opacity-50"
+                                                title="Test Run"
                                             >
                                                 {automation.isTestRunning ? (
-                                                    <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+                                                    <div className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                                                 ) : (
-                                                    <Play className="w-4 h-4" />
+                                                    <Play className="w-3.5 h-3.5" />
                                                 )}
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(automation.id)}
-                                                className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition"
+                                                className="p-1.5 text-[#4B5563] hover:text-red-400 hover:bg-red-500/10 rounded transition"
                                                 title="Delete"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <Trash2 className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                /* List View - Full width row */
+                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                    <div className="flex items-start gap-4 flex-1">
+                                        {/* Selection Checkbox */}
+                                        <div className="pt-1">
+                                            <label className="relative flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(automation.id)}
+                                                    onChange={() => toggleSelect(automation.id)}
+                                                    className="peer h-4 w-4 opacity-0 absolute cursor-pointer"
+                                                />
+                                                <div className="h-4 w-4 border border-[#1F2937] rounded bg-white/5 peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all flex items-center justify-center">
+                                                    <CheckCircle className={`w-3 h-3 text-black font-bold ${selectedIds.includes(automation.id) ? 'block' : 'hidden'}`} />
+                                                </div>
+                                            </label>
+                                        </div>
+
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                {/* Status dot */}
+                                                <div className={`w-2 h-2 rounded-full ${automation.status === 'active' ? 'bg-emerald-500' : 'bg-[#4B5563]'}`} />
+                                                <h3 className="text-lg font-semibold text-white">{automation.name}</h3>
+                                                {automation.status === 'paused' && (
+                                                    <span className="px-2 py-1 rounded text-[10px] bg-orange-500/10 text-orange-500 font-bold border border-orange-500/20 uppercase flex items-center gap-1">
+                                                        <Pause className="w-3 h-3" /> Paused
+                                                    </span>
+                                                )}
+                                                {automation.status === 'active' && (
+                                                    <span className="px-2 py-1 rounded text-[10px] bg-emerald-500/10 text-emerald-500 font-bold border border-emerald-500/20 uppercase flex items-center gap-1">
+                                                        <Play className="w-3 h-3 fill-emerald-500" /> Active
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[#9CA3AF] text-sm mb-4 line-clamp-2 max-w-2xl">
+                                                {automation.description || 'No description provided.'}
+                                            </p>
+
+                                            <div className="flex items-center gap-4 text-xs text-[#4B5563]">
+                                                <span className="flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5" />
+                                                    {formatLastRun(automation.lastRun)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            {/* Activate/Pause Button */}
+                                            <Button
+                                                onClick={() => handleToggle(automation.id, automation.status)}
+                                                className={`h-9 px-4 text-xs font-semibold ${automation.status === 'active'
+                                                    ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border border-yellow-500/20'
+                                                    : 'bg-transparent border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10'
+                                                    }`}
+                                            >
+                                                {automation.status === 'active' ? (
+                                                    <><Pause className="w-3.5 h-3.5 mr-1.5" /> Pause</>
+                                                ) : (
+                                                    <><Play className="w-3.5 h-3.5 mr-1.5 fill-emerald-500" /> Activate</>
+                                                )}
+                                            </Button>
+
+                                            {/* Action Icons */}
+                                            <div className="flex items-center gap-0.5 bg-black/40 p-1 rounded-lg border border-[#1F2937]">
+                                                <button
+                                                    onClick={() => handleTestRun(automation.id, automation.name)}
+                                                    disabled={automation.isTestRunning}
+                                                    className="p-2 text-[#4B5563] hover:text-emerald-500 hover:bg-emerald-500/10 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    title="Test Run (Run Once)"
+                                                >
+                                                    {automation.isTestRunning ? (
+                                                        <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                                                    ) : (
+                                                        <Play className="w-4 h-4" />
+                                                    )}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(automation.id)}
+                                                    className="p-2 text-[#4B5563] hover:text-red-400 hover:bg-red-500/10 rounded transition"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -374,4 +432,3 @@ export default function DashboardPage() {
         </div>
     );
 }
-

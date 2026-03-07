@@ -9,6 +9,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { MouseGlow } from '@/components/ui/mouse-glow';
+import { DashboardCacheProvider } from '@/providers/dashboard-cache-provider';
 
 export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -27,7 +28,7 @@ export default function DashboardLayout({ children }) {
     const isActive = (path) => pathname === path;
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-green-500/30 selection:text-green-200 flex">
+        <div className="min-h-screen bg-[#0A0A0A] text-white font-sans selection:bg-emerald-500/30 selection:text-emerald-200 flex">
             <MouseGlow />
 
             {/* Subtle Grid Background */}
@@ -39,7 +40,7 @@ export default function DashboardLayout({ children }) {
             <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="fixed top-4 left-4 z-50 md:hidden bg-[#0A0A0A] border border-white/10 p-2 rounded-lg text-white"
+                className="fixed top-4 left-4 z-50 md:hidden bg-[#111111] border border-[#1F2937] p-2 rounded-lg text-white"
             >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </motion.button>
@@ -49,12 +50,12 @@ export default function DashboardLayout({ children }) {
                 initial={{ width: 280 }}
                 animate={{ width: sidebarOpen ? 280 : 80 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="fixed left-0 top-0 h-full bg-[#0A0A0A] border-r border-white/5 z-40 hidden md:block overflow-hidden"
+                className="fixed left-0 top-0 h-full bg-[#0A0A0A] border-r border-[#1F2937] z-40 hidden md:block overflow-hidden"
             >
                 <div className="flex flex-col h-full p-6">
                     {/* Logo */}
                     <div className={`flex items-center gap-3 mb-10 ${!sidebarOpen ? 'justify-center' : ''}`}>
-                        <div className="bg-green-600 p-1.5 rounded-lg shadow-lg shadow-green-900/20 shrink-0">
+                        <div className="bg-emerald-500 p-1.5 rounded-lg shadow-lg shadow-emerald-900/20 shrink-0">
                             <Zap className="w-5 h-5 text-white fill-white" />
                         </div>
                         {sidebarOpen && (
@@ -74,7 +75,7 @@ export default function DashboardLayout({ children }) {
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
-                                className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium shadow-lg shadow-green-900/20 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-2"
                             >
                                 <Plus className="w-5 h-5" />
                                 Create Flow
@@ -85,7 +86,7 @@ export default function DashboardLayout({ children }) {
                             <motion.button
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
-                                className="p-3 rounded-lg bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20 transition-all"
+                                className="p-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 transition-all"
                             >
                                 <Plus className="w-5 h-5" />
                             </motion.button>
@@ -101,13 +102,13 @@ export default function DashboardLayout({ children }) {
                                     key={index}
                                     href={item.href}
                                     className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative ${active
-                                            ? 'bg-white/5 text-green-400'
-                                            : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                        ? 'bg-white/5 text-emerald-400'
+                                        : 'text-[#9CA3AF] hover:bg-white/5 hover:text-white'
                                         } ${!sidebarOpen ? 'justify-center' : ''}`}
                                 >
-                                    {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-green-500 rounded-r-full" />}
+                                    {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-emerald-500 rounded-r-full" />}
 
-                                    <item.icon className={`w-5 h-5 ${active ? 'text-green-400' : 'text-gray-400 group-hover:text-white'} transition-colors`} />
+                                    <item.icon className={`w-5 h-5 ${active ? 'text-emerald-400' : 'text-[#9CA3AF] group-hover:text-white'} transition-colors`} />
 
                                     {sidebarOpen && (
                                         <span className="font-medium">{item.label}</span>
@@ -118,9 +119,9 @@ export default function DashboardLayout({ children }) {
                     </nav>
 
                     {/* User Profile */}
-                    <div className="border-t border-white/5 pt-4 mt-auto">
+                    <div className="border-t border-[#1F2937] pt-4 mt-auto">
                         <div className={`flex items-center gap-3 ${!sidebarOpen ? 'justify-center' : ''}`}>
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border border-white/10 flex items-center justify-center shrink-0">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border border-[#1F2937] flex items-center justify-center shrink-0">
                                 <span className="text-sm font-bold text-white">
                                     {user?.name?.[0]?.toUpperCase() || 'U'}
                                 </span>
@@ -129,14 +130,14 @@ export default function DashboardLayout({ children }) {
                             {sidebarOpen && (
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold text-white truncate">{user?.name || 'User'}</p>
-                                    <p className="text-xs text-green-500 font-medium truncate">PRO PLAN</p>
+                                    <p className="text-xs text-emerald-500 font-medium truncate">PRO PLAN</p>
                                 </div>
                             )}
 
                             {sidebarOpen && (
                                 <button
                                     onClick={logout}
-                                    className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition"
+                                    className="p-2 text-[#9CA3AF] hover:text-white hover:bg-white/5 rounded-lg transition"
                                 >
                                     <LogOut className="w-5 h-5" />
                                 </button>
@@ -162,12 +163,12 @@ export default function DashboardLayout({ children }) {
                             animate={{ x: 0 }}
                             exit={{ x: -280 }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed left-0 top-0 h-full w-72 bg-[#0A0A0A] border-r border-white/10 z-40 md:hidden"
+                            className="fixed left-0 top-0 h-full w-72 bg-[#0A0A0A] border-r border-[#1F2937] z-40 md:hidden"
                         >
                             <div className="flex flex-col h-full p-6">
                                 {/* Logo */}
                                 <div className="flex items-center gap-3 mb-8">
-                                    <div className="bg-green-600 p-1.5 rounded-lg shadow-lg shadow-green-900/20">
+                                    <div className="bg-emerald-500 p-1.5 rounded-lg shadow-lg shadow-emerald-900/20">
                                         <Zap className="w-5 h-5 text-white fill-white" />
                                     </div>
                                     <span className="text-xl font-bold tracking-tight text-white">
@@ -176,7 +177,7 @@ export default function DashboardLayout({ children }) {
                                 </div>
 
                                 <Link href="/dashboard/create" onClick={() => setMobileMenuOpen(false)} className="mb-8">
-                                    <button className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium shadow-lg shadow-green-900/20">
+                                    <button className="w-full py-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium shadow-lg shadow-emerald-900/20">
                                         + Create Flow
                                     </button>
                                 </Link>
@@ -191,8 +192,8 @@ export default function DashboardLayout({ children }) {
                                                 href={item.href}
                                                 onClick={() => setMobileMenuOpen(false)}
                                                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${active
-                                                        ? 'bg-white/5 text-green-400'
-                                                        : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                                    ? 'bg-white/5 text-emerald-400'
+                                                    : 'text-[#9CA3AF] hover:bg-white/5 hover:text-white'
                                                     }`}
                                             >
                                                 <item.icon className="w-5 h-5" />
@@ -203,16 +204,16 @@ export default function DashboardLayout({ children }) {
                                 </nav>
 
                                 {/* User Profile */}
-                                <div className="border-t border-white/5 pt-4 mt-auto">
+                                <div className="border-t border-[#1F2937] pt-4 mt-auto">
                                     <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border border-white/10 flex items-center justify-center">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border border-[#1F2937] flex items-center justify-center">
                                             <span className="text-sm font-bold text-white">
                                                 {user?.name?.[0]?.toUpperCase() || 'U'}
                                             </span>
                                         </div>
                                         <div>
                                             <p className="text-sm font-semibold text-white">{user?.name || 'User'}</p>
-                                            <p className="text-xs text-green-500 font-medium">PRO PLAN</p>
+                                            <p className="text-xs text-emerald-500 font-medium">PRO PLAN</p>
                                         </div>
                                     </div>
 
@@ -233,7 +234,9 @@ export default function DashboardLayout({ children }) {
             {/* Main Content */}
             <main className={`flex-1 min-h-screen transition-all duration-300 ${sidebarOpen ? 'md:pl-72' : 'md:pl-20'} relative z-10`}>
                 <div className="p-6 md:p-10 max-w-[1600px] mx-auto">
-                    {children}
+                    <DashboardCacheProvider>
+                        {children}
+                    </DashboardCacheProvider>
                 </div>
             </main>
         </div>
